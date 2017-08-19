@@ -43,10 +43,13 @@ namespace MyHealth.Client.Core
             get { return _selectedDoctor; }
             set
             {
-                _selectedDoctor = value;
-                RaisePropertyChanged(() => SelectedDoctor);
+                if (value != _selectedDoctor)
+                {
+                    _selectedDoctor = value;
+                    RaisePropertyChanged(() => SelectedDoctor);
 
-                SelectedDate = DateTime.Today;
+                    SelectedDate = DateTime.Today;
+                }
             }
         }
 
@@ -61,10 +64,13 @@ namespace MyHealth.Client.Core
             get { return _selectedHour; }
             set
             {
-                _selectedHour = value;
-                _selectedAppointmentDateAndHour = SelectedDate.WithTime(_selectedHour);
-                IsEverythingCorrectlyFilled = !string.IsNullOrWhiteSpace(_selectedHour);
-                RaisePropertyChanged(() => SelectedHour);
+                if (value != _selectedHour)
+                {
+                    _selectedHour = value;
+                    _selectedAppointmentDateAndHour = SelectedDate.WithTime(_selectedHour);
+                    IsEverythingCorrectlyFilled = !string.IsNullOrWhiteSpace(_selectedHour);
+                    RaisePropertyChanged(() => SelectedHour);
+                }
             }
         }
 
@@ -78,12 +84,15 @@ namespace MyHealth.Client.Core
             get { return _selectedSpeciality; }
             set
             {
-                _selectedSpeciality = value;
+                if (value != _selectedSpeciality)
+                { 
+                    _selectedSpeciality = value;
 
-                RaisePropertyChanged(() => SelectedSpeciality);
+                    RaisePropertyChanged(() => SelectedSpeciality);
 
-                SelectedDoctor = null;
-                GetDoctorsForSpecialtyAsync(_selectedSpeciality).Forget();
+                    SelectedDoctor = null;
+                    GetDoctorsForSpecialtyAsync(_selectedSpeciality).Forget();
+                }
             }
         }
 
@@ -218,7 +227,7 @@ namespace MyHealth.Client.Core
                 IsBusy = true;
 
                 var patient = await client.PatientsService.GetAsync(
-                    AppSettings.DefaultPatientId);
+                    AppSettings.CurrentPatientId);
                 int roomNumber = _random.Next(AppSettings.MinimumRoomNumber,
                         AppSettings.MaximumRoomNumber);
                 var appointment = new ClinicAppointment
@@ -234,10 +243,10 @@ namespace MyHealth.Client.Core
 
                 await client.AppointmentsService.PostAsync(appointment);
 
-                if (!string.IsNullOrEmpty(MicrosoftGraphService.LoggedInUserEmail))
+                if (AppSettings.OutlookIntegration)
                 {
                     // Add the event to the patient's calendar
-                    await MicrosoftGraphService.AddEventUsingRestApiAsync(
+                    await MicrosoftGraphService.AddEventAsync(
                         subject: "Clinic Appointment with " + _selectedDoctor.Name,
                         startTime: _selectedAppointmentDateAndHour,
                         endTime: _selectedAppointmentDateAndHour + TimeSpan.FromMinutes(45),
@@ -315,12 +324,12 @@ namespace MyHealth.Client.Core
                 actualHours.Add(date);
             }
             // Remove times that are conflicting with doctor's calendar.
-            if (!string.IsNullOrEmpty(MicrosoftGraphService.LoggedInUserEmail))
+            if (AppSettings.OutlookIntegration)
             {
                 // Get patient events from calendar.
                 //TODO: Use Rest api instead to workaround issue. Revert to Microsoft Graph Service after the issue is resolved.
                 //events = await MicrosoftGraphService.GetEventsAsync(_selectedDate);
-                PatientEvents = await MicrosoftGraphService.GetEventsUsingRestApiAsync(_selectedDate);
+                PatientEvents = await MicrosoftGraphService.GetEventsAsync(_selectedDate);
                 //TODO: uncomment the following to enable doctor calendar integration.
                 //if (_selectedDoctor != null)
                 //{

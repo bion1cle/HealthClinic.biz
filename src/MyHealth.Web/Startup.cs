@@ -9,6 +9,7 @@ using MyHealth.Data.Infraestructure;
 using MyHealth.Model;
 using MyHealth.Web.AppBuilderExtensions;
 using Microsoft.Extensions.PlatformAbstractions;
+using MyHealth.API.Infrastructure;
 
 namespace MyHealth.Web
 {
@@ -63,6 +64,7 @@ namespace MyHealth.Web
 
             services.AddSession();
 
+            services.AddAuthorization(Policies.Configuration);
         }
 
         // Configure is called after ConfigureServices is called.

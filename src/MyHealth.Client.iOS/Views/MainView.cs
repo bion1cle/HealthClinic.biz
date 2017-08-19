@@ -1,26 +1,33 @@
+using System;
+using System.Threading.Tasks;
+using Cirrious.CrossCore;
 using Cirrious.MvvmCross.Touch.Views;
 using Cirrious.MvvmCross.ViewModels;
 using Foundation;
-using CoreGraphics;
-using MyHealth.Client.Core.ViewModels;
-using System;
-using System.CodeDom.Compiler;
-using UIKit;
+using LocalAuthentication;
+using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using MyHealth.Client.Core;
+using MyHealth.Client.Core.Helpers;
+using MyHealth.Client.Core.ServiceAgents;
+using MyHealth.Client.Core.Services;
+using MyHealth.Client.Core.ViewModels;
+using UIKit;
 using Xamarin.Forms;
 
 namespace MyHealth.Client.iOS
 {
-    partial class MainView : MvxTabBarViewController<MainViewModel>
+	partial class MainView : MvxTabBarViewController<MainViewModel>
 	{
-        private int tabsCreatedSoFar = 0;
+		private static readonly UIFont Font = UIFont.FromName ("Avenir-Book", 10);
+
+		private int _tabsCreatedSoFar = 0;
 
         public MainView(IntPtr handle)
             : base(handle)
         {
         }
 
-        public override void ViewDidLoad()
+        public async override void ViewDidLoad()
         {
             base.ViewDidLoad();
 
@@ -29,29 +36,137 @@ namespace MyHealth.Client.iOS
                 return;
             }
 
-            // Settings needed by the Microsoft Graph service client.
-            MicrosoftGraphService.SetAuthenticationUiContext(new Microsoft.Experimental.IdentityModel.Clients.ActiveDirectory.PlatformParameters(this));
-            MicrosoftGraphService.SetClientId(AppSettings.iOSClientId);
-            MicrosoftGraphService.SetRedirectUri(AppSettings.RedirectUri);
-
             SetUpNavBar();
-            this.SetUpTabBar();
+            SetUpTabBar();
+
             var appDelegate = (MyHealthAppDelegate) UIApplication.SharedApplication.Delegate;
             appDelegate.Tabs = this;
+
+			if (Settings.SecurityEnabled)
+			{
+				if (Settings.TouchIdEnrolledAndFingerprintDetected)
+					AuthenticateThroughFingerprint();
+				else
+					await AuthenticateThroughAzureADAndAddFingerprintAsync();
+			}
         }
 
-        public override void ItemSelected(UITabBar tabbar, UITabBarItem item)
+        private void AuthenticateThroughFingerprint()
         {
-            Title = item.Title;
+            var context = new LAContext();
+            NSError authError;
+            var myReason = new NSString(
+                "Please, provide your fingerprint to access the app.");
+            if (context.CanEvaluatePolicy(LAPolicy.DeviceOwnerAuthenticationWithBiometrics, out authError))
+            {
+                var replyHandler = new LAContextReplyHandler((success, error) => 
+                    {
+                        this.InvokeOnMainThread(async () => 
+                            {
+                                if (success)
+								{
+									await AuthenticateThroughAzureADAsync();
+                                    return;
+								}
+
+                                var dialogService = Mvx.Resolve<IDialogService>();
+                                await dialogService.AlertAsync(
+                                    "We could not detect your fingerprint. " +
+                                    "You will be asked again to enter your Azure AD credentials. " +
+                                    "Thank you.",
+                                    "Touch ID",
+                                    "OK");
+
+								// Since we're waking up, we need to silently sign in, and
+								// sign out just after to clear local cache
+								await AuthenticateThroughAzureADAsync ();
+								SignOutFromAzureAD ();
+
+                                // If fingerprint not detected, repeat Azure AD auth.
+                                await AuthenticateThroughAzureADAndAddFingerprintAsync()
+                                    .ConfigureAwait(false);
+                            });
+                    });
+                context.EvaluatePolicy(LAPolicy.DeviceOwnerAuthenticationWithBiometrics, myReason, replyHandler);
+            }
         }
 
-		void SetUpNavBar ()
+		void SignOutFromAzureAD ()
+		{
+			var myHealthClient = Mvx.Resolve<IMyHealthClient> ();
+
+			myHealthClient?.AuthenticationService?.SignOut ();
+		}
+
+		private async Task AuthenticateThroughAzureADAsync ()
+		{
+			var authenticationParentUiContext = new PlatformParameters (this);
+			var myHealthClient = Mvx.Resolve<IMyHealthClient> ();
+
+			ViewModel.IsBusy = true;
+
+			if (myHealthClient != null)
+				await myHealthClient.AuthenticationService.SignInAsync (authenticationParentUiContext);
+
+			ViewModel.IsBusy = false;
+		}
+
+        private async Task AuthenticateThroughAzureADAndAddFingerprintAsync ()
+        {
+            await AuthenticateThroughAzureADAsync ();
+
+            // If we went beyond this line the Azure AD auth. was a success
+            AddFingerprintAuthentication();
+        }
+
+        private void AddFingerprintAuthentication()
+        {
+            var context = new LAContext();
+            NSError authError;
+            var myReason = new NSString(
+                "Please, provide your fingerprint to simplify the authentication.");
+            if (context.CanEvaluatePolicy(LAPolicy.DeviceOwnerAuthenticationWithBiometrics, out authError))
+            {
+                var replyHandler = new LAContextReplyHandler((success, error) => 
+                {
+                    this.InvokeOnMainThread(() => 
+                    {
+                        var dialogService = Mvx.Resolve<IDialogService>();
+
+                        if (success)
+                        {
+                            Settings.TouchIdEnrolledAndFingerprintDetected = true;
+
+                            dialogService.AlertAsync(
+                                "Your fingerprint was successfully detected. " +
+                                "You can access the app through it from now on. " +
+                                "Thank you.",
+                                "Touch ID",
+                                "OK");
+                        }
+                        else
+                        {
+                            Settings.TouchIdEnrolledAndFingerprintDetected = false;
+
+                            dialogService.AlertAsync(
+                                "We could not detect your fingerprint. " +
+                                "You will need to authenticate through Azure AD. " +
+                                "Thank you.",
+                                "Touch ID",
+                                "OK");
+                        }
+                    });
+                });
+                context.EvaluatePolicy(LAPolicy.DeviceOwnerAuthenticationWithBiometrics, myReason, replyHandler);
+            }
+        }
+
+		private void SetUpNavBar ()
 		{
             var newAppointmentButton = new UIBarButtonItem (
                 UIImage.FromBundle("ic_newappointment.png"),
 				UIBarButtonItemStyle.Plain,
                 (sender, args) => ViewModel.ShowNewAppointment());
-
            
             NavigationController.NavigationBar.BarTintColor = UIColor.FromRGB(0, 199, 188);
             NavigationController.HidesBarsOnSwipe = true;
@@ -77,8 +192,8 @@ namespace MyHealth.Client.iOS
 
             TabBar.TintColor = Colors.Accent;
             NavigationItem.Title = SelectedViewController.Title;
-            // selectedviewcontorller change
-            this.ViewControllerSelected += (o, e) =>
+            
+			this.ViewControllerSelected += (o, e) =>
             {
                 NavigationItem.Title = TabBar.SelectedItem.Title;
             };
@@ -109,51 +224,18 @@ namespace MyHealth.Client.iOS
             screen.TabBarItem = new UITabBarItem(
                 title,
                 UIImage.FromBundle(imageName + "normal.png").ImageWithRenderingMode(UIImageRenderingMode.AlwaysOriginal),
-                tabsCreatedSoFar);
+                _tabsCreatedSoFar);
 			screen.TabBarItem.SelectedImage = UIImage.FromBundle(imageName + "active.png")
 				.ImageWithRenderingMode(UIImageRenderingMode.AlwaysOriginal);
 
-			var font = UIFont.FromName ("Avenir-Book", 10);
-
 			screen.TabBarItem.SetTitleTextAttributes (
-				new UITextAttributes { TextColor = Colors.TabBarNormalText, Font = font },
+				new UITextAttributes { TextColor = Colors.TabBarNormalText, Font = Font },
 				UIControlState.Normal);
 			screen.TabBarItem.SetTitleTextAttributes (
-				new UITextAttributes { TextColor = Colors.Accent, Font = font },
+				new UITextAttributes { TextColor = Colors.Accent, Font = Font },
 				UIControlState.Selected);
 
-            tabsCreatedSoFar++;
-        }
-        void SetupTabChangeAnimation()
-        {
-            //I want to animate the tab changes. Its subtle but it adds a little bitof flair
-            ShouldSelectViewController = (tabController, controller) =>
-            {
-                if (SelectedViewController == null || controller == SelectedViewController)
-                    return true;
-
-                var fromView = SelectedViewController.View;
-                var toView = controller.View;
-
-                var destFrame = fromView.Frame;
-                const float offset = 20;
-
-                //Position toView off screen
-                fromView.Superview.AddSubview(toView);
-                toView.Frame = new CGRect(offset, destFrame.Y, destFrame.Width, destFrame.Height);
-
-                UIView.Animate(0.25,
-                    () =>
-                    {
-                        toView.Frame = new CGRect(0, destFrame.Y, destFrame.Width, destFrame.Height);
-                    }, () =>
-                    {
-                        //Completion handler. Remove old view
-                        fromView.RemoveFromSuperview();
-                        SelectedViewController = controller;
-                    });
-                return true;
-            };
+            _tabsCreatedSoFar++;
         }
     }
 }

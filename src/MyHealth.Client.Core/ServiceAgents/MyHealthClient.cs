@@ -1,6 +1,4 @@
-﻿
-using System;
-using MvvmCross.Plugins.Messenger;
+﻿using MvvmCross.Plugins.Messenger;
 
 namespace MyHealth.Client.Core.ServiceAgents
 {
@@ -18,11 +16,20 @@ namespace MyHealth.Client.Core.ServiceAgents
         TenantsService _tenantsService;
         HomeAppointmentsService _homeAppointmentsService;
         DoctorCalendarService _doctorCalendarService;
+        AuthenticationService _authenticationService;
         string _serverUrl;
         int _tenantId;
         MvxSubscriptionToken _token;
 
         #region Services Properties
+
+        public AuthenticationService AuthenticationService
+        {
+            get
+            {
+                return _authenticationService ?? (_authenticationService = new AuthenticationService(PatientsService, _messenger));
+            }
+        }
 
         public TipsService TipsService
         {

@@ -51,8 +51,7 @@
                HorizontalAlignment="Left"
                VerticalAlignment="Bottom"
                Width="150" Margin="20"/>
-        <StackPanel Visibility="{Binding IsBusy, Converter={StaticResource InverseBoolToVisibilityConverter}}"
-                    x:Name="StackPanel"
+        <StackPanel x:Name="StackPanel"
                     Margin="10"
                     VerticalAlignment="Center"
                     HorizontalAlignment="Center">
@@ -63,15 +62,20 @@
                      Height="60"
                      BorderThickness="0"
                      Background="{StaticResource MyHealthWhiteThemeBrush}"
-                     Text="{Binding ServerAddress, Mode=TwoWay}"
+                     Text="{x:Bind SettingsViewModel.ServerAddress, Mode=TwoWay}"
                      Style="{StaticResource SettingsTextBoxStyle}"/>
             <TextBlock x:Name="TextInfo"
-                       Text="please type a valid url"
+                       Text="Please type a valid url"
+                       Visibility="{x:Bind SettingsViewModel.IsInvalidUrl, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}"
                        Margin="0,5,0,0"
                        Style="{StaticResource RegularTextStyle}"
                        Foreground="{StaticResource MyHealthBlackThemeBrush}"
                        Opacity="0.6"
                        FontSize="18"/>
+            <CheckBox Margin="0, 15, 0, 0" 
+                      Content="Require login at Start" 
+                      FontFamily="/Assets/Fonts/Roboto-Regular.ttf#Roboto"
+                      IsChecked="{Binding AzureADAuthorizationEnabled, Mode=TwoWay}" />
             <Grid Margin="0,25,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition/>
@@ -84,8 +88,8 @@
                         Content="Accept" 
                         FontSize="18"
                         Margin="0,0,3,0"
-                        IsEnabled="{Binding IsInvalidUrl, Converter={StaticResource NotConverter}}"
-                        Command="{Binding AcceptCommand}"
+                        IsEnabled="{x:Bind SettingsViewModel.IsInvalidUrl, Converter={StaticResource NotConverter}, Mode=OneWay}"
+                        Command="{x:Bind SettingsViewModel.AcceptCommand}"
                         Foreground="{StaticResource MyHealthBackgroundBlueThemeBrush}"
                         Background="{StaticResource MyHealthWhiteThemeBrush}"
                         Style="{StaticResource SettingsButtonStyle}"/>
@@ -97,7 +101,7 @@
                         Content="Cancel"
                         FontSize="18"
                         Margin="3,0,0,0"
-                        Command="{Binding CancelCommand}"
+                        Command="{x:Bind SettingsViewModel.CancelCommand}"
                         Foreground="{StaticResource MyHealthBackgroundBlueThemeBrush}"
                         Background="{StaticResource MyHealthWhiteThemeBrush}"
                         Style="{StaticResource SettingsButtonStyle}"/>

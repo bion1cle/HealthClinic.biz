@@ -23,12 +23,12 @@ namespace MyHealth.Client.iOS
 
 		// Push Notifications related vars
 		private MobileServiceClient _client;
-        private string _deviceToken;
 
         UIWindow _window;
 
         public override bool FinishedLaunching(UIApplication app, NSDictionary options) {
             SetupNotifications();
+
             //We MUST wrap our setup in this block to wire up
             // Mono's SIGSEGV and SIGBUS signals
             HockeyApp.Setup.EnableCustomCrashReporting(() =>
@@ -44,6 +44,9 @@ namespace MyHealth.Client.iOS
                 manager.StartManager();
 
                 //Authenticate (there are other authentication options)
+                //manager.Authenticator will be null if HockeyAppiOSAppID was not set
+                if (manager.Authenticator != null)
+                {
                 manager.Authenticator.AuthenticateInstallation();
 
                 //Rethrow any unhandled .NET exceptions as native iOS 
@@ -51,8 +54,9 @@ namespace MyHealth.Client.iOS
                 TaskScheduler.UnobservedTaskException += (sender, e) =>
                     HockeyApp.Setup.ThrowExceptionAsNative(e.Exception);
 
-                AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
-                    HockeyApp.Setup.ThrowExceptionAsNative(e.ExceptionObject);
+                    AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+                        HockeyApp.Setup.ThrowExceptionAsNative(e.ExceptionObject);
+                }
             });
 
             Forms.Init();
@@ -60,8 +64,6 @@ namespace MyHealth.Client.iOS
             _window = new UIWindow(UIScreen.MainScreen.Bounds);
 
             Akavache.BlobCache.ApplicationName = "MyHealth";
-
-            
 
             var setup = new Setup(this, _window);
             setup.Initialize();
@@ -134,39 +136,27 @@ namespace MyHealth.Client.iOS
 
         private void SetupNotifications()
         {
-			// If the device is iOS 8.0...
-			if (UIDevice.CurrentDevice.CheckSystemVersion (8, 0)) {
-				Debug.WriteLine ("APNS: Detected iOS 8");
-				var pushSettings = UIUserNotificationSettings.GetSettingsForTypes (
-					UIUserNotificationType.Alert |
-					UIUserNotificationType.Badge |
-					UIUserNotificationType.Sound,
-					new NSSet ()
-				);
-				UIApplication.SharedApplication.RegisterUserNotificationSettings (pushSettings);
-				UIApplication.SharedApplication.RegisterForRemoteNotifications ();
-			} else {
-				Debug.WriteLine ("APNS: Detected iOS 9");
-				UIRemoteNotificationType notificationTypes = 
-					UIRemoteNotificationType.Alert |
-					UIRemoteNotificationType.Badge |
-					UIRemoteNotificationType.Sound;
-				
-				UIApplication.SharedApplication.RegisterForRemoteNotificationTypes (notificationTypes);
+			// If iOS is >= 8.0...
+			if (UIDevice.CurrentDevice.CheckSystemVersion (8, 0)) 
+            {
+                var pushSettings = UIUserNotificationSettings.GetSettingsForTypes (
+                    UIUserNotificationType.Alert |
+                    UIUserNotificationType.Badge |
+                    UIUserNotificationType.Sound,
+                    new NSSet ()
+                );
+
+                UIApplication.SharedApplication.RegisterUserNotificationSettings (pushSettings);
+                UIApplication.SharedApplication.RegisterForRemoteNotifications ();
 			}
-			Debug.WriteLine ("APNS: Registering...");
         }
 
         public override async void RegisteredForRemoteNotifications(UIApplication application, NSData deviceToken)
         {
             try
             {
-				// Get & Modify device token
-				_deviceToken = deviceToken.Description;
-				_deviceToken = _deviceToken.Trim ('<', '>').Replace (" ", "");
-
 				// Instantiate a MobileService Client
-                _client = new MobileServiceClient(AppSettings.MobileAPIUrl, AppSettings.MobileAPIUrl, string.Empty);
+                _client = new MobileServiceClient(AppSettings.MobileAPIUrl);
 
                 // Register for push with your mobile app
                 var push = _client.GetPush();
@@ -178,22 +168,19 @@ namespace MyHealth.Client.iOS
                 JObject templates = new JObject();
                 templates["testApsTemplate"] = templateBody;
 
-				await push.RegisterAsync(_deviceToken, templates);
+				await push.RegisterAsync(deviceToken, templates);
+
+                // Add a new tag to get only the notification for the default patientId.
+                var tags = new JArray();
+                tags.Add(AppSettings.DefaultTenantId);
+
+                await _client.InvokeApiAsync("updatetags/" + _client.InstallationId, tags);
+
             }
             catch (Exception e)
             {
                 Debug.WriteLine("RegisteredForRemoteNotifications -> exception -> " + e.Message);
             }
-        }
-
-        public override void DidRegisterUserNotificationSettings(UIApplication application, UIUserNotificationSettings notificationSettings)
-        {
-            application.RegisterForRemoteNotifications();
-        }
-
-        public override void FailedToRegisterForRemoteNotifications(UIApplication application, NSError error)
-        {
-            Debug.WriteLine("FailedToRegisterForRemoteNotifications ->" + error.ToString());
         }
 
         public override void DidReceiveRemoteNotification(UIApplication application, NSDictionary userInfo, Action<UIBackgroundFetchResult> completionHandler)

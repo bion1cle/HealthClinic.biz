@@ -1,19 +1,24 @@
-﻿using Cirrious.MvvmCross.ViewModels;
-using MvvmCross.Plugins.Messenger;
-using MyHealth.Client.Core.Model;
-using MyHealth.Client.Core.ServiceAgents;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Cirrious.MvvmCross.ViewModels;
+using MvvmCross.Plugins.Messenger;
+using MyHealth.Client.Core.Helpers;
+using MyHealth.Client.Core.Messages;
+using MyHealth.Client.Core.Model;
+using MyHealth.Client.Core.ServiceAgents;
 
 namespace MyHealth.Client.Core.ViewModels
 {
     public class UserViewModel : BaseViewModel
     {
         private const int MaxAppointmentsToList = 10;
+
         private readonly IMyHealthClient _myHealthClient;
         private Patient _user;
         private ObservableCollection<ClinicAppointment> _appointmentsHistory;
+		private IDisposable _subscriptionToken;
 
         public Patient User
         {
@@ -35,20 +40,15 @@ namespace MyHealth.Client.Core.ViewModels
             }
         }
 
-        public IMvxCommand LoginCommand
-        {
-            get
-            {
-                return new MvxCommand(async () =>
-                {
-                    await LoginAsync();
-                });
-            }
-        }
-
         public UserViewModel(IMyHealthClient client, IMvxMessenger messenger) : base(messenger)
         {
             _myHealthClient = client;
+
+			// Since iOS creates this VM from the beginning because of the bottom TabBar 
+			// (Android doesn't, due to the left drawer) we need to notice of Azure AD
+			// auth. happening in a future
+			_subscriptionToken = _messenger.Subscribe<LoggedUserInfoChangedMessage>(_ => 
+            	UpdateUserInfoIfSuchWasRetrievedFromMicrosoftGraph());
         }
 
         public override void Start()
@@ -59,38 +59,29 @@ namespace MyHealth.Client.Core.ViewModels
         }
 
         protected override async Task InitializeAsync()
-        {
-            await InitializeUserAsync();
-        }
+		{
+			User = await _myHealthClient.PatientsService.GetAsync (AppSettings.CurrentPatientId);
+			UpdateUserInfoIfSuchWasRetrievedFromMicrosoftGraph ();
 
-        private async Task InitializeUserAsync()
-        {
-            if (!string.IsNullOrEmpty(MicrosoftGraphService.LoggedInUser))
-            {
-                User = (await _myHealthClient.PatientsService.GetByNameAsync(MicrosoftGraphService.LoggedInUser, 1)).FirstOrDefault();
-                return;
-            }
+			var appointments = await _myHealthClient.AppointmentsService.GetPatientAppointmentsAsync (AppSettings.CurrentPatientId, MaxAppointmentsToList);
+			AppointmentsHistory = new ObservableCollection<ClinicAppointment> (appointments);
+		}
 
-			var userTask = _myHealthClient.PatientsService.GetAsync(AppSettings.DefaultPatientId);
-			var appointmentsTask = _myHealthClient.AppointmentsService.GetPatientAppointmentsAsync(AppSettings.DefaultPatientId, MaxAppointmentsToList);
+		private void UpdateUserInfoIfSuchWasRetrievedFromMicrosoftGraph ()
+		{
+			if (!string.IsNullOrWhiteSpace (MicrosoftGraphService.LoggedUser) &&
+						   !string.IsNullOrWhiteSpace (MicrosoftGraphService.LoggedUserEmail)) {
+				User.Name = MicrosoftGraphService.LoggedUser;
+				User.Email = MicrosoftGraphService.LoggedUserEmail;
 
-			await Task.WhenAll (userTask, appointmentsTask);
+				RaisePropertyChanged (() => User);
+			}
 
-			User = await userTask;
-			var appointments = await appointmentsTask;
+			if (MicrosoftGraphService.LoggedUserPhoto != null) {
+				User.Picture = MicrosoftGraphService.LoggedUserPhoto;
 
-            AppointmentsHistory = new ObservableCollection<ClinicAppointment>(appointments);
-        }
-
-        private async Task LoginAsync ()
-        {
-            // sign into outlook.com account
-            if (string.IsNullOrEmpty(MicrosoftGraphService.LoggedInUserEmail))
-            {
-                await MicrosoftGraphService.SignInAsync();
-                var currentUser = MicrosoftGraphService.LoggedInUser;
-                var currentUserEmail = MicrosoftGraphService.LoggedInUserEmail;
-            }
-        }
+				RaisePropertyChanged (() => User);
+			}
+		}
     }
 }

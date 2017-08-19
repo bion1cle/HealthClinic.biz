@@ -8,18 +8,15 @@ using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
 using MyHealth.Client.Core.ViewModels;
 using MyHealth.Client.W10.UWP.Services;
+using System.Threading.Tasks;
+using Microsoft.IdentityModel.Clients.ActiveDirectory;
+using MyHealth.Client.Core.ServiceAgents;
+using MyHealth.Client.Core.Helpers;
 
 namespace MyHealth.Client.W10.UWP
 {
-    /// <summary>
-    /// Provides application-specific behavior to supplement the default Application class.
-    /// </summary>
     sealed partial class App : Application
     {
-        /// <summary>
-        /// Initializes the singleton application object.  This is the first line of authored code
-        /// executed, and as such is the logical equivalent of main() or WinMain().
-        /// </summary>
         public App()
         {
             Microsoft.ApplicationInsights.WindowsAppInitializer.InitializeAsync(
@@ -30,7 +27,7 @@ namespace MyHealth.Client.W10.UWP
             Suspending += OnSuspending;
         }
 
-        protected override void OnLaunched(LaunchActivatedEventArgs args)
+        protected async override void OnLaunched(LaunchActivatedEventArgs args)
         {
             var rootFrame = Window.Current.Content as Frame;
 
@@ -56,6 +53,8 @@ namespace MyHealth.Client.W10.UWP
                 var setup = new Setup(rootFrame);
                 setup.Initialize();
 
+                await AskForADCredentialsAsync();
+
                 Window.Current.Content = new Views.MainView(rootFrame, Mvx.Resolve<IMvxMessenger>());
 
                 var start = Mvx.Resolve<Cirrious.MvvmCross.ViewModels.IMvxAppStart>();
@@ -66,6 +65,16 @@ namespace MyHealth.Client.W10.UWP
             // Ensure the current window is active
             Window.Current.Activate();
             PushNotifications.UploadChannel();
+        }
+
+        private async Task AskForADCredentialsAsync()
+        {
+            if (Settings.SecurityEnabled)
+            {
+                var messenger = Mvx.Resolve<IMvxMessenger>();
+                MyHealthClient client = new MyHealthClient(messenger);
+                await client.AuthenticationService.SignInAsync(new PlatformParameters(PromptBehavior.Always, false));
+            }
         }
 
         /// <summary>

@@ -17,7 +17,9 @@ namespace MyHealth.Client.Core.ViewModels
     {
         private readonly ICurrentUserService _userSvc;
         private Patient _currentUser;
-        public ObservableCollection<MenuItem> MenuItems { get; private set; }
+		private IDisposable _subscriptionToken;
+        
+		public ObservableCollection<MenuItem> MenuItems { get; private set; }
 
         public MvxCommand<MenuItem> ItemSelectedCommand { get; private set; }
 
@@ -39,6 +41,9 @@ namespace MyHealth.Client.Core.ViewModels
         public MenuViewModel(ICurrentUserService usvc, IMvxMessenger messenger) : base(messenger)
         {
             _userSvc = usvc;
+
+			_subscriptionToken = _messenger.Subscribe<LoggedUserInfoChangedMessage>(UpdateLoggedUserInfo);
+
             MenuItems = new ObservableCollection<MenuItem>();
             ItemSelectedCommand = new MvxCommand<MenuItem>(OnSelectItem);
 
@@ -77,8 +82,6 @@ namespace MyHealth.Client.Core.ViewModels
                 ViewModelType = typeof(SettingsViewModel),
                 Option = MenuOption.Settings
             });
-
-
         }
 
         private void OnSelectItem(MenuItem item)
@@ -95,13 +98,13 @@ namespace MyHealth.Client.Core.ViewModels
             }
 
             ShowViewModel(item.ViewModelType);
-
         }
 
         private void RaiseCloseMenu()
         {
             var handler = CloseMenu;
-            if (handler != null)
+            
+			if (handler != null)
             {
                 handler(this, EventArgs.Empty);
             }
@@ -116,14 +119,15 @@ namespace MyHealth.Client.Core.ViewModels
                     menuItem.IsSelected = false;
                 }
             }
-            item.IsSelected = true;
-
+            
+			item.IsSelected = true;
         }
 
         public override void Start()
         {
             base.Start();
-            ReloadDataAsync().Forget();
+            
+			ReloadDataAsync().Forget();
         }
 
         protected override async Task InitializeAsync()
@@ -131,5 +135,13 @@ namespace MyHealth.Client.Core.ViewModels
             CurrentUser = await _userSvc.GetCurrentAsync();
         }
 
+		private void UpdateLoggedUserInfo(LoggedUserInfoChangedMessage msg)
+        {
+			CurrentUser.Name = MicrosoftGraphService.LoggedUser;
+			CurrentUser.Email = MicrosoftGraphService.LoggedUserEmail;
+			CurrentUser.Picture = MicrosoftGraphService.LoggedUserPhoto;
+
+            RaisePropertyChanged(() => CurrentUser);
+        }
     }
 }

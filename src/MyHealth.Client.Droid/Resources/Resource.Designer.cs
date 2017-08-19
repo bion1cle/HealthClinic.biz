@@ -90,9 +90,9 @@ namespace MyHealth.Client.Droid
 			global::Cirrious.MvvmCross.Binding.Droid.Resource.Styleable.MvxListView_MvxDropDownItemTemplate = global::MyHealth.Client.Droid.Resource.Styleable.MvxListView_MvxDropDownItemTemplate;
 			global::Cirrious.MvvmCross.Binding.Droid.Resource.Styleable.MvxListView_MvxItemTemplate = global::MyHealth.Client.Droid.Resource.Styleable.MvxListView_MvxItemTemplate;
 			global::Gcm.Client.Resource.String.library_name = global::MyHealth.Client.Droid.Resource.String.library_name;
-			global::Microsoft.Experimental.IdentityModel.Clients.ActiveDirectory.Resource.Id.agentWebView = global::MyHealth.Client.Droid.Resource.Id.agentWebView;
-			global::Microsoft.Experimental.IdentityModel.Clients.ActiveDirectory.Resource.Layout.WebAuthenticationBroker = global::MyHealth.Client.Droid.Resource.Layout.WebAuthenticationBroker;
-			global::Microsoft.Experimental.IdentityModel.Clients.ActiveDirectory.Resource.String.ApplicationName = global::MyHealth.Client.Droid.Resource.String.ApplicationName;
+			global::Microsoft.IdentityModel.Clients.ActiveDirectory.Resource.Id.agentWebView = global::MyHealth.Client.Droid.Resource.Id.agentWebView;
+			global::Microsoft.IdentityModel.Clients.ActiveDirectory.Resource.Layout.WebAuthenticationBroker = global::MyHealth.Client.Droid.Resource.Layout.WebAuthenticationBroker;
+			global::Microsoft.IdentityModel.Clients.ActiveDirectory.Resource.String.ApplicationName = global::MyHealth.Client.Droid.Resource.String.ApplicationName;
 			global::Splat.Resource.String.library_name = global::MyHealth.Client.Droid.Resource.String.library_name;
 			global::Xamarin.Forms.Platform.Resource.String.ApplicationName = global::MyHealth.Client.Droid.Resource.String.ApplicationName;
 			global::Xamarin.Forms.Platform.Resource.String.Hello = global::MyHealth.Client.Droid.Resource.String.Hello;
@@ -1874,14 +1874,14 @@ namespace MyHealth.Client.Droid
 			// aapt resource value: 0x7f0b0027
 			public const int action_mode_close_button = 2131427367;
 			
-			// aapt resource value: 0x7f0b0098
-			public const int action_new_appointment = 2131427480;
+			// aapt resource value: 0x7f0b0097
+			public const int action_new_appointment = 2131427479;
 			
 			// aapt resource value: 0x7f0b0028
 			public const int activity_chooser_view_content = 2131427368;
 			
-			// aapt resource value: 0x7f0b0097
-			public const int agentWebView = 2131427479;
+			// aapt resource value: 0x7f0b0096
+			public const int agentWebView = 2131427478;
 			
 			// aapt resource value: 0x7f0b0032
 			public const int alertTitle = 2131427378;
@@ -2054,8 +2054,8 @@ namespace MyHealth.Client.Droid
 			// aapt resource value: 0x7f0b007e
 			public const int linearLayoutNavigationCalendar = 2131427454;
 			
-			// aapt resource value: 0x7f0b0096
-			public const int linearMainContent = 2131427478;
+			// aapt resource value: 0x7f0b0095
+			public const int linearMainContent = 2131427477;
 			
 			// aapt resource value: 0x7f0b007a
 			public const int linearWaitingTime = 2131427450;
@@ -2095,9 +2095,6 @@ namespace MyHealth.Client.Droid
 			
 			// aapt resource value: 0x7f0b0020
 			public const int multiply = 2131427360;
-			
-			// aapt resource value: 0x7f0b0095
-			public const int myButton = 2131427477;
 			
 			// aapt resource value: 0x7f0b0069
 			public const int navigation_drawer_list = 2131427433;

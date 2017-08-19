@@ -8,6 +8,7 @@ using MyHealth.Client.Core.Helpers;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Globalization;
+using MyHealth.Client.Core.Messages;
 
 namespace MyHealth.Client.Core.ViewModels
 {
@@ -25,6 +26,7 @@ namespace MyHealth.Client.Core.ViewModels
 		ClinicAppointment _firstAppointment, _secondAppointment;
         ObservableCollection<Appointment> _appointments;
 		Tip _tip;
+		MvxSubscriptionToken _loggedUserInfoChangedSubscriptionToken;
 
 		public bool FirstMedicineSelected
 		{ 
@@ -128,13 +130,21 @@ namespace MyHealth.Client.Core.ViewModels
 			: base(messenger)
 		{
 			_myHealthClient = myHealthClient;
+
+			// If secutiry was enabled in Settings, I'd like this VM to load when auth. happens,
+			// not before (to avoid data seen in background while auth. is happening)
+			if (Settings.SecurityEnabled) {
+				_loggedUserInfoChangedSubscriptionToken = _messenger.Subscribe<LoggedUserInfoChangedMessage> (
+					_ => ReloadDataAsync ().Forget ());
+			}
         }
 
         public override void Start()
         {
             base.Start();
 
-            ReloadDataAsync().Forget();
+			if (!Settings.SecurityEnabled)
+            	ReloadDataAsync().Forget();
         }
 
         protected override async Task InitializeAsync ()
@@ -152,7 +162,7 @@ namespace MyHealth.Client.Core.ViewModels
 
 		async Task RetrieveAppointmentsAsync ()
 		{
-			var appointments = await _myHealthClient.AppointmentsService.GetPatientAppointmentsAsync (AppSettings.DefaultPatientId, AmountOfAppointments);
+			var appointments = await _myHealthClient.AppointmentsService.GetPatientAppointmentsAsync (AppSettings.CurrentPatientId, AmountOfAppointments);
 			if (appointments.Count > 0)
 				FirstAppointment = appointments.First ();
             if (appointments.Count >= 2)
@@ -164,7 +174,7 @@ namespace MyHealth.Client.Core.ViewModels
 
 		async Task RetrieveMedecinesAsync ()
 		{
-			var medicines = await _myHealthClient.MedicinesService.GetMedicinesWithDosesAsync (AppSettings.DefaultPatientId, AmountOfMedicines);
+			var medicines = await _myHealthClient.MedicinesService.GetMedicinesWithDosesAsync (AppSettings.CurrentPatientId, AmountOfMedicines);
 			if (medicines.Count > 0)
 				FirstMedicine = medicines.First ();
 			if (medicines.Count >= 2)
